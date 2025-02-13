@@ -1,7 +1,5 @@
 ---
-title: "Untitled"
-author: "Jeronimo"
-date: "`r Sys.Date()`"
+title: "Taller 1"
 output: html_document
 ---
 
@@ -36,6 +34,8 @@ data$Munic_Dept <- as.numeric(data$Munic_Dept)
 ## Procesamiento de la Base de Datos de Población
 pob$Dato.Numérico <- as.numeric(gsub("\\.", "", gsub(",", ".", pob$Dato.Numérico)))
 pob$Código.Entidad <- as.numeric(pob$Código.Entidad)
+
+View(pob)
 pob_suma <- pob %>%
   group_by(Código.Entidad) %>%
   summarise(Poblacion_Total = sum(Dato.Numérico, na.rm = TRUE))
@@ -70,14 +70,26 @@ data_arch2 <- data %>%
 
 
 ## PASO 3: Calcular proporciones
-final_data <- data_arch2 / data_arch1
-final_data$Munic_Dept <-  data_arch1$Munic_Dept
-
+final_data <-  data_arch2/data_arch1
+final_data$Munic_Dept <- data_arch1$Munic_Dept
+final_data <- as.matrix(final_data)  
+final_data[is.na(final_data)] <- 0   
+final_data <- as.data.frame(final_data)  
 
 ## PASO 4: Merge con municipios con población
 final_data1 <- inner_join(final_data, pob_suma, by = c("Munic_Dept" = "Código.Entidad"))
-View(final_data1)
+
+## PASO 5: Exportarlo: 
+write.csv(final_data1, here('data/final',"data.csv"), row.names = FALSE)
+
+## PASO 6: Obtener el formato long para porder usar filtros.
+final_data1_long <- final_data1 %>%
+  pivot_longer(cols = -c(Munic_Dept,Poblacion_Total),  
+               names_to = "AE", 
+               values_to = "PP")
+
+## PASO 7: Exportarlo.
+write.csv(final_data1_long, here('data/final',"data_long.csv"), row.names = FALSE)
+
 
 ```
-
-
