@@ -1,0 +1,83 @@
+---
+title: "Untitled"
+author: "Jeronimo"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+## Carga de Librerías
+library(dplyr)
+library(readxl)
+library(tidyr)
+library(agricolae)
+library(fdth)
+library(lessR)
+library(gmodels)
+library(here)
+library(haven)
+library(openxlsx)
+```
+
+
+```{r}
+## Carga de DFs
+data <- read_dta(here('data/raw','TenderosFU03_Publica.dta'))
+pob <- read.xlsx(here('data/raw','POBLACION1.xlsx'))
+
+## Procesamiento BD Tenderos
+data$Munic_Dept <- as.numeric(data$Munic_Dept)
+
+## Procesamiento de la Base de Datos de Población
+pob$Dato.Numérico <- as.numeric(gsub("\\.", "", gsub(",", ".", pob$Dato.Numérico)))
+pob$Código.Entidad <- as.numeric(pob$Código.Entidad)
+pob_suma <- pob %>%
+  group_by(Código.Entidad) %>%
+  summarise(Poblacion_Total = sum(Dato.Numérico, na.rm = TRUE))
+
+```
+
+```{r}
+##PASO 2
+final_data_wide <- data %>%
+  select(Munic_Dept, uso_internet, starts_with("actG")) %>%
+  pivot_longer(cols = starts_with("actG"), names_to = "Actividad", values_to = "Cantidad") %>%
+  group_by(Munic_Dept, Actividad) %>%
+  summarise(usaInternet = sum(Cantidad, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = Actividad, values_from = usaInternet, names_prefix = "usaInternet")
+
+```
+
+```{r}
+## PASO 1: Agrupar por municipio y actividad económica
+data_arch1 <- data %>%
+  group_by(Munic_Dept) %>%
+  arrange(Munic_Dept) %>%
+  summarise(across(starts_with("actG"), sum, na.rm = TRUE))
+  
+
+## PASO 2: Filtrar por uso de internet y agrupar por municipio
+data_arch2 <- data %>%
+  filter(uso_internet == 1) %>%
+  group_by(Munic_Dept) %>%
+  arrange(Munic_Dept) %>%
+  summarise(Tiendas_Internet <- across(starts_with("actG"), sum, na.rm = TRUE))
+
+
+## PASO 3: Calcular proporciones
+final_data <- data_arch2 / data_arch1
+final_data$Munic_Dept <-  data_arch1$Munic_Dept
+
+
+## PASO 4: Merge con municipios con población
+final_data1 <- inner_join(final_data, pob_suma, by = c("Munic_Dept" = "Código.Entidad"))
+View(final_data1)
+
+```
+
+
