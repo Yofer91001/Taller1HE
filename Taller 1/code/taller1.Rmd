@@ -24,18 +24,18 @@ library(openxlsx)
 
 
 ```{r}
-## Carga de DFs
+## Carga de DFs desde la carpeta data/raw
 data <- read_dta(here('data/raw','TenderosFU03_Publica.dta'))
 pob <- read.xlsx(here('data/raw','POBLACION1.xlsx'))
 
-## Procesamiento BD Tenderos
+## Procesamiento BD Tenderos, castear el tipo de dato numerico para el codigo de municipio
 data$Munic_Dept <- as.numeric(data$Munic_Dept)
 
-## Procesamiento de la Base de Datos de Población
+## Procesamiento de la Base de Datos de Población, castear al formato correcto el codigo de departamento y la poblacion
 pob$Dato.Numérico <- as.numeric(gsub("\\.", "", gsub(",", ".", pob$Dato.Numérico)))
 pob$Código.Entidad <- as.numeric(pob$Código.Entidad)
 
-View(pob)
+# Agrupamos por departamento todos los municipios y agregamos la poblacion con una suma
 pob_suma <- pob %>%
   group_by(Código.Entidad) %>%
   summarise(Poblacion_Total = sum(Dato.Numérico, na.rm = TRUE))
@@ -43,7 +43,7 @@ pob_suma <- pob %>%
 ```
 
 ```{r}
-##PASO 2
+
 final_data_wide <- data %>%
   select(Munic_Dept, uso_internet, starts_with("actG")) %>%
   pivot_longer(cols = starts_with("actG"), names_to = "Actividad", values_to = "Cantidad") %>%
@@ -54,14 +54,14 @@ final_data_wide <- data %>%
 ```
 
 ```{r}
-## PASO 1: Agrupar por municipio y actividad económica
+## PASO 1: Agrupar por municipio y actividad económica, luego agregar sumando las variables actG, que contienen la cantidad de tenderos para una actividad econmica
 data_arch1 <- data %>%
-  group_by(Munic_Dept) %>%
+  group_by(Munic_Dept) %>% 
   arrange(Munic_Dept) %>%
   summarise(across(starts_with("actG"), sum, na.rm = TRUE))
   
 
-## PASO 2: Filtrar por uso de internet y agrupar por municipio
+## PASO 2: Filtrar aquellos tenderos que tienen internet, luego grupar por municipio y actividad económica, y finalmente agregar sumando las variables actG, que contienen la cantidad de tenderos para una actividad econmica
 data_arch2 <- data %>%
   filter(uso_internet == 1) %>%
   group_by(Munic_Dept) %>%
@@ -69,17 +69,17 @@ data_arch2 <- data %>%
   summarise(Tiendas_Internet <- across(starts_with("actG"), sum, na.rm = TRUE))
 
 
-## PASO 3: Calcular proporciones
+## PASO 3: Calcular proporciones de los tenderos que tienen internet sobre el total.
 final_data <-  data_arch2/data_arch1
 final_data$Munic_Dept <- data_arch1$Munic_Dept
 final_data <- as.matrix(final_data)  
 final_data[is.na(final_data)] <- 0   
 final_data <- as.data.frame(final_data)  
 
-## PASO 4: Merge con municipios con población
+## PASO 4: Join entre el df generado y aquel que contine la poblacion por departamento (pob)
 final_data1 <- inner_join(final_data, pob_suma, by = c("Munic_Dept" = "Código.Entidad"))
 
-## PASO 5: Exportarlo: 
+## PASO 5: Exportar df en formato wide: 
 write.csv(final_data1, here('data/final',"data.csv"), row.names = FALSE)
 
 ## PASO 6: Obtener el formato long para porder usar filtros.
@@ -88,7 +88,7 @@ final_data1_long <- final_data1 %>%
                names_to = "AE", 
                values_to = "PP")
 
-## PASO 7: Exportarlo.
+## PASO 7: Exportar formato long.
 write.csv(final_data1_long, here('data/final',"data_long.csv"), row.names = FALSE)
 
 
